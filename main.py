@@ -13,7 +13,7 @@ class DiscordEEWBot(commands.Bot):
             command_prefix=(), help_command=None, intents=discord.Intents.default()
         )
 
-        self.initial_extensions = ["cogs.debug", "cogs.p2p"]
+        self.initial_extensions = ["cogs.debug", "cogs.p2pquake"]
 
     async def setup_hook(self) -> None:
         for extension in self.initial_extensions:
