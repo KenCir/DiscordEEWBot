@@ -138,7 +138,7 @@ def format_earthquake_tsunami(tsunami: str) -> str:
             return "不明"
 
 
-def format_points(points: list) -> discord.Embed:
+def format_earthquake_points(points: list) -> discord.Embed:
     """
     各地の震度情報を変換する
     :param points:
@@ -178,7 +178,7 @@ class P2PQuake(commands.Cog):
 
     async def cog_load(self) -> None:
         if self.bot.is_ready():
-            self.bot.loop.create_task(self.listen_p2p())
+            self.bot.loop.create_task(self.listen_p2pquake())
 
     async def cog_unload(self) -> None:
         if self.ws is not None:
@@ -186,9 +186,9 @@ class P2PQuake(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        self.bot.loop.create_task(self.listen_p2p())
+        self.bot.loop.create_task(self.listen_p2pquake())
 
-    async def listen_p2p(self):
+    async def listen_p2pquake(self):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
                 "wss://api-realtime-sandbox.p2pquake.net/v2/ws"
@@ -201,8 +201,13 @@ class P2PQuake(commands.Cog):
                         data = msg.json()
                         print(data)
 
-                        if data["code"] == 551:
-                            await self.on_jmaquake(data)
+                        match data["code"]:
+                            case 551:  # 地震情報
+                                await self.on_jma_quake(data)
+                            case 552:  # 津波予報
+                                await self.on_jma_tunami(data)
+                            case 556:  # 緊急地震速報(警報)
+                                await self.on_jma_eew(data)
                     elif (
                         msg.type == aiohttp.WSMsgType.ERROR
                         or msg.type == aiohttp.WSMsgType.CLOSE
@@ -211,7 +216,7 @@ class P2PQuake(commands.Cog):
 
                 print("P2P WebSocket Disconnected")
 
-    async def on_jmaquake(self, data) -> None:
+    async def on_jma_quake(self, data) -> None:
         embeds = []
         embed = discord.Embed(
             title=f"地震情報({format_issue_type(data['issue']['type'])})",
@@ -256,9 +261,57 @@ class P2PQuake(commands.Cog):
         )
         embeds.append(embed)
         if len(data["points"]) > 0:
-            embeds.append(format_points(data["points"]))
+            embeds.append(format_earthquake_points(data["points"]))
 
         await self.bot.get_channel(972836497747226654).send(embeds=embeds)
+
+    async def on_jma_tunami(self, data) -> None:
+        pass  # TODO
+
+    async def on_jma_eew(self, data) -> None:
+        if data.get("test", False):
+            return
+
+        if data["cancelled"]:
+            embed = discord.Embed(
+                title="緊急地震速報(取消)",
+                description="先ほどの緊急地震速報は取り消されました",
+                timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
+            )
+        else:
+            embed = discord.Embed(
+                title="緊急地震速報(警報)",
+                description="緊急地震速報が発表されました",
+                timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
+            )
+            if data["earthquake"]["hypocenter"]["name"]:
+                embed.add_field(
+                    name="震源地",
+                    value=data["earthquake"]["hypocenter"]["name"],
+                    inline=False,
+                )
+                embed.add_field(
+                    name="深さ",
+                    value=format_earthquake_depth(
+                        int(data["earthquake"]["hypocenter"]["depth"])
+                    ),
+                    inline=False,
+                )
+                embed.add_field(
+                    name="マグニチュード",
+                    value=format_earthquake_magnitude(
+                        int(data["earthquake"]["hypocenter"]["magnitude"])
+                    ),
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name="震源地",
+                    value="不明",
+                    inline=False,
+                )
+
+        embed.set_footer(text=f"P2P地震情報 | {data['issue']['time']}に発表しました")
 
 
 async def setup(bot):
