@@ -313,6 +313,8 @@ class P2PQuake(commands.Cog):
 
         embed.set_footer(text=f"P2P地震情報 | {data['issue']['time']}に発表しました")
 
+        await self.bot.get_channel(972836497747226654).send(embed=embed)
+
 
 async def setup(bot):
     await bot.add_cog(P2PQuake(bot))
