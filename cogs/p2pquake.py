@@ -2,8 +2,16 @@ from datetime import datetime
 
 import aiohttp
 import discord
+from discord import app_commands
 from discord.ext import commands
 from main import DiscordEEWBot
+
+QUAKE_NOTICE_CHANNEL_ID = 1022180008762019931
+QUAKE_NOTICE_ROLE_ID = 1329352490499571722
+TUNAMI_NOTICE_CHANNEL_ID = 1329352412892499988
+TUNAMI_NOTICE_ROLE_ID = 1329352555578396743
+EEW_NOTICE_CHANNEL_ID = 1022179884384133170
+EEW_NOTICE_ROLE_ID = 1329352085065568331
 
 
 def format_issue_type(issue_type: str) -> str:
@@ -154,8 +162,6 @@ def format_earthquake_points(points: list) -> discord.Embed:
         {"scale": 45, "name": "震度5弱"},
         {"scale": 40, "name": "震度4"},
         {"scale": 30, "name": "震度3"},
-        {"scale": 20, "name": "震度2"},
-        {"scale": 10, "name": "震度1"},
     ]
     embed = discord.Embed(title="各地の震度情報")
 
@@ -188,6 +194,19 @@ class P2PQuake(commands.Cog):
     async def on_ready(self):
         self.bot.loop.create_task(self.listen_p2pquake())
 
+    @app_commands.command(name="p2p-test")
+    async def test(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Test")
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.p2pquake.net/v2/history?codes=552"
+            ) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    await self.on_jma_tunami(data[1])
+                    await self.on_jma_tunami(data[0])
+
     async def listen_p2pquake(self):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
@@ -206,8 +225,16 @@ class P2PQuake(commands.Cog):
                                 await self.on_jma_quake(data)
                             case 552:  # 津波予報
                                 await self.on_jma_tunami(data)
+                            case 554:  # (緊急地震速報 発表検出)
+                                pass
+                            case 555:  # (各地域ピア数)
+                                pass
                             case 556:  # 緊急地震速報(警報)
                                 await self.on_jma_eew(data)
+                            case 561:  # 地震感知情報
+                                pass
+                            case 9611:  # 地震感知情報 解析結果
+                                pass
                     elif (
                         msg.type == aiohttp.WSMsgType.ERROR
                         or msg.type == aiohttp.WSMsgType.CLOSE
@@ -260,13 +287,54 @@ class P2PQuake(commands.Cog):
             text=f"P2P地震情報 | {data['issue']['source']}が{data['issue']['time']}に発表しました"
         )
         embeds.append(embed)
-        if len(data["points"]) > 0:
+        if len(data["points"]) > 0 and data["earthquake"]["maxScale"] >= 30:
             embeds.append(format_earthquake_points(data["points"]))
 
-        await self.bot.get_channel(972836497747226654).send(embeds=embeds)
+        await self.bot.get_channel(QUAKE_NOTICE_CHANNEL_ID).send(
+            content=f"<@&{QUAKE_NOTICE_ROLE_ID}>", embeds=embeds
+        )
 
     async def on_jma_tunami(self, data) -> None:
-        pass  # TODO
+        if data["cancelled"]:
+            embed = discord.Embed(
+                title="津波予報情報(解除)",
+                description="先ほどの津波予報情報は解除されました",
+                timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
+            )
+            embed.set_footer(
+                text=f"P2P地震情報 | {data['issue']['source']}が{data['issue']['time']}に発表しました"
+            )
+        else:
+            grades = [
+                {"grade": "MajorWarning", "name": "大津波警報"},
+                {"grade": "Warning", "name": "津波警報"},
+                {"grade": "Watch", "name": "津波注意報"},
+                {"grade": "Unknown", "name": "不明"},
+            ]
+            embed = discord.Embed(
+                title="津波予報情報",
+                description=f"津波予報情報が発表されました",
+                timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
+            )
+
+            for grade in grades:
+                filtered_areas = list(
+                    filter(lambda x: x["grade"] == grade["grade"], data["areas"])
+                )
+                if len(filtered_areas) > 0:
+                    embed.add_field(
+                        name=grade["name"],
+                        value=", ".join(map(lambda area: area["name"], filtered_areas)),
+                        inline=False,
+                    )
+
+            embed.set_footer(
+                text=f"P2P地震情報 | {data['issue']['source']}が{data['issue']['time']}に発表しました"
+            )
+
+        await self.bot.get_channel(TUNAMI_NOTICE_CHANNEL_ID).send(
+            content=f"<@&{TUNAMI_NOTICE_ROLE_ID}>", embed=embed
+        )
 
     async def on_jma_eew(self, data) -> None:
         if data.get("test", False):
@@ -277,12 +345,14 @@ class P2PQuake(commands.Cog):
                 title="緊急地震速報(取消)",
                 description="先ほどの緊急地震速報は取り消されました",
                 timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
+                color=discord.Color.blue(),
             )
         else:
             embed = discord.Embed(
                 title="緊急地震速報(警報)",
                 description="緊急地震速報が発表されました",
                 timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
+                color=discord.Color.red(),
             )
             if data["earthquake"]["hypocenter"]["name"]:
                 embed.add_field(
@@ -313,7 +383,9 @@ class P2PQuake(commands.Cog):
 
         embed.set_footer(text=f"P2P地震情報 | {data['issue']['time']}に発表しました")
 
-        await self.bot.get_channel(972836497747226654).send(embed=embed)
+        await self.bot.get_channel(EEW_NOTICE_CHANNEL_ID).send(
+            content=f"<@&{EEW_NOTICE_ROLE_ID}>", embed=embed
+        )
 
 
 async def setup(bot):
