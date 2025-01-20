@@ -210,7 +210,8 @@ class P2PQuake(commands.Cog):
     async def listen_p2pquake(self):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
-                "wss://api-realtime-sandbox.p2pquake.net/v2/ws"
+                # "wss://api-realtime-sandbox.p2pquake.net/v2/ws"
+                "https://api.p2pquake.net/v2/ws"
             ) as ws:
                 self.ws = ws
                 print("P2P WebSocket Connected")
