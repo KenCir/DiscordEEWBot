@@ -1,3 +1,4 @@
+import traceback
 from datetime import datetime
 
 import aiohttp
@@ -216,31 +217,36 @@ class P2PQuake(commands.Cog):
                 self.ws = ws
                 print("P2P WebSocket Connected")
 
-                async for msg in ws:
-                    if msg.type == aiohttp.WSMsgType.TEXT:
-                        data = msg.json()
-                        print(data)
+                try:
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            data = msg.json()
+                            print(data)
 
-                        match data["code"]:
-                            case 551:  # 地震情報
-                                await self.on_jma_quake(data)
-                            case 552:  # 津波予報
-                                await self.on_jma_tunami(data)
-                            case 554:  # (緊急地震速報 発表検出)
-                                pass
-                            case 555:  # (各地域ピア数)
-                                pass
-                            case 556:  # 緊急地震速報(警報)
-                                await self.on_jma_eew(data)
-                            case 561:  # 地震感知情報
-                                pass
-                            case 9611:  # 地震感知情報 解析結果
-                                pass
-                    elif (
-                        msg.type == aiohttp.WSMsgType.ERROR
-                        or msg.type == aiohttp.WSMsgType.CLOSE
-                    ):
-                        break
+                            match data["code"]:
+                                case 551:  # 地震情報
+                                    await self.on_jma_quake(data)
+                                case 552:  # 津波予報
+                                    await self.on_jma_tunami(data)
+                                case 554:  # (緊急地震速報 発表検出)
+                                    pass
+                                case 555:  # (各地域ピア数)
+                                    pass
+                                case 556:  # 緊急地震速報(警報)
+                                    await self.on_jma_eew(data)
+                                case 561:  # 地震感知情報
+                                    pass
+                                case 9611:  # 地震感知情報 解析結果
+                                    pass
+                        elif (
+                            msg.type == aiohttp.WSMsgType.ERROR
+                            or msg.type == aiohttp.WSMsgType.CLOSE
+                        ):
+                            break
+                except Exception as e:
+                    print(traceback.format_exc())
+                    await self.ws.close()
+                    self.bot.loop.create_task(self.listen_p2pquake())
 
                 print("P2P WebSocket Disconnected")
 
