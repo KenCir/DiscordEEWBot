@@ -195,19 +195,6 @@ class P2PQuake(commands.Cog):
     async def on_ready(self):
         self.bot.loop.create_task(self.listen_p2pquake())
 
-    @app_commands.command(name="p2p-test")
-    async def test(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Test")
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "https://api.p2pquake.net/v2/history?codes=552"
-            ) as r:
-                if r.status == 200:
-                    data = await r.json()
-                    await self.on_jma_tunami(data[1])
-                    await self.on_jma_tunami(data[0])
-
     async def listen_p2pquake(self):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
