@@ -14,7 +14,7 @@ RUN groupadd -g $GID $GROUPNAME && \
     useradd -m -s /bin/bash -u $UID -g $GID $USERNAME
 
 RUN mkdir -p $WORKDIR && \
-    chown -R $USERNAME:$GROUPNAME $WORKDIR \
+    chown -R $USERNAME:$GROUPNAME $WORKDIR
 
 USER $USERNAME
 
