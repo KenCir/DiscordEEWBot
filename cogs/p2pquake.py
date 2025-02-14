@@ -1,3 +1,4 @@
+import os
 import traceback
 from datetime import datetime
 
@@ -199,7 +200,8 @@ class P2PQuake(commands.Cog):
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
                 # "wss://api-realtime-sandbox.p2pquake.net/v2/ws"
-                "https://api.p2pquake.net/v2/ws"
+                "https://api.p2pquake.net/v2/ws",
+                proxy=os.environ.get("PROXY_URL"),
             ) as ws:
                 self.ws = ws
                 print("P2P WebSocket Connected")
@@ -241,7 +243,7 @@ class P2PQuake(commands.Cog):
         embeds = []
         embed = discord.Embed(
             title=f"地震情報({format_issue_type(data['issue']['type'])})",
-            description=f"{data['earthquake']['time']}頃、{f"{data['earthquake']['hypocenter']['name']}で" if data['earthquake']['hypocenter']['name'] else ''}最大震度"
+            description=f"{data['earthquake']['time']}頃、{f'{data["earthquake"]["hypocenter"]["name"]}で' if data['earthquake']['hypocenter']['name'] else ''}最大震度"
             f"{format_earthquake_scale(data['earthquake']['maxScale'])}の地震がありました\n{format_issue_correct(data['issue']['correct'])}",
             timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
         )
