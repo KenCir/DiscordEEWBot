@@ -16,7 +16,7 @@ build==1.2.2.post1
     # via pip-tools
 click==8.1.7
     # via pip-tools
-discord-py==2.4.0
+discord-py==2.5.0
     # via -r requirements.in
 frozenlist==1.5.0
     # via
