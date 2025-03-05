@@ -210,7 +210,6 @@ class P2PQuake(commands.Cog):
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = msg.json()
-                            print(data)
 
                             match data["code"]:
                                 case 551:  # 地震情報
