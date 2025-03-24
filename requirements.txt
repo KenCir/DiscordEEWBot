@@ -42,7 +42,7 @@ pyproject-hooks==1.2.0
     #   pip-tools
 python-dotenv==1.0.1
     # via -r requirements.in
-ruff==0.9.9
+ruff==0.11.2
     # via -r requirements.in
 wheel==0.45.1
     # via pip-tools
