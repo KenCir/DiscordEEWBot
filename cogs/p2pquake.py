@@ -200,8 +200,8 @@ class P2PQuake(commands.Cog):
 
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
-                # "wss://api-realtime-sandbox.p2pquake.net/v2/ws"
-                "https://api.p2pquake.net/v2/ws",
+                "wss://api-realtime-sandbox.p2pquake.net/v2/ws",
+                # "https://api.p2pquake.net/v2/ws",
                 proxy=os.environ.get("PROXY_URL"),
             ) as ws:
                 self.ws = ws
@@ -212,9 +212,9 @@ class P2PQuake(commands.Cog):
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = msg.json()
 
-                            if data.get("id") == latest_data_id:
+                            if data.get("_id") == latest_data_id:
                                 continue
-                            latest_data_id = data.get("id")
+                            latest_data_id = data.get("_id")
 
                             match data["code"]:
                                 case 551:  # 地震情報
