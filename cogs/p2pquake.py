@@ -200,8 +200,8 @@ class P2PQuake(commands.Cog):
 
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
-                "wss://api-realtime-sandbox.p2pquake.net/v2/ws",
-                # "https://api.p2pquake.net/v2/ws",
+                # "wss://api-realtime-sandbox.p2pquake.net/v2/ws",
+                "https://api.p2pquake.net/v2/ws",
                 proxy=os.environ.get("PROXY_URL"),
             ) as ws:
                 self.ws = ws
