@@ -196,6 +196,8 @@ class P2PQuake(commands.Cog):
         self.bot.loop.create_task(self.listen_p2pquake())
 
     async def listen_p2pquake(self):
+        latest_data_id = None
+
         async with aiohttp.ClientSession() as session:
             async with session.ws_connect(
                 # "wss://api-realtime-sandbox.p2pquake.net/v2/ws"
@@ -209,6 +211,10 @@ class P2PQuake(commands.Cog):
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = msg.json()
+
+                            if data.get("id") == latest_data_id:
+                                continue
+                            latest_data_id = data.get("id")
 
                             match data["code"]:
                                 case 551:  # 地震情報
