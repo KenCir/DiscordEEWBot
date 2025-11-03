@@ -5,6 +5,7 @@ from datetime import datetime
 
 import aiohttp
 import discord
+from discord import app_commands
 from discord.ext import commands
 from main import DiscordEEWBot
 
@@ -184,6 +185,7 @@ class P2PQuake(commands.Cog):
         self.bot = bot
         self.ws = None
         self.logger = logging.getLogger("p2pquake")
+        self.latest_quake_data = None
 
     async def cog_load(self) -> None:
         if self.bot.is_ready():
@@ -246,6 +248,7 @@ class P2PQuake(commands.Cog):
                 self.logger.info("P2P WebSocket Disconnected")
 
     async def on_jma_quake(self, data) -> None:
+        self.latest_quake_data = data
         embeds = []
         embed = discord.Embed(
             title=f"地震情報({format_issue_type(data['issue']['type'])})",
@@ -388,6 +391,57 @@ class P2PQuake(commands.Cog):
         await self.bot.get_channel(EEW_NOTICE_CHANNEL_ID).send(
             content=f"<@&{EEW_NOTICE_ROLE_ID}>", embed=embed
         )
+
+    @app_commands.command(name="quake-info", description="最新の地震情報を表示します")
+    async def quake_info(self, interaction: discord.Interaction):
+        data = self.latest_quake_data
+        if data is None:
+            await interaction.response.send_message("No Data")
+            return
+
+        embed = discord.Embed(
+            title=f"地震情報({format_issue_type(data['issue']['type'])})",
+            description=f"{data['earthquake']['time']}頃、{f'{data["earthquake"]["hypocenter"]["name"]}で' if data['earthquake']['hypocenter']['name'] else ''}最大震度"
+            f"{format_earthquake_scale(data['earthquake']['maxScale'])}の地震がありました\n{format_issue_correct(data['issue']['correct'])}",
+            timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
+        )
+        embed.add_field(
+            name="最大震度",
+            value=format_earthquake_scale(data["earthquake"]["maxScale"]),
+            inline=False,
+        )
+        embed.add_field(
+            name="発生時刻",
+            value=f"{data['earthquake']['time']}頃",
+            inline=False,
+        )
+        embed.add_field(
+            name="震源地",
+            value=data["earthquake"]["hypocenter"]["name"] or "調査中",
+            inline=False,
+        )
+        embed.add_field(
+            name="深さ",
+            value=format_earthquake_depth(data["earthquake"]["hypocenter"]["depth"]),
+            inline=False,
+        )
+        embed.add_field(
+            name="マグニチュード",
+            value=format_earthquake_magnitude(
+                data["earthquake"]["hypocenter"]["magnitude"]
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="津波の有無",
+            value=format_earthquake_tsunami(data["earthquake"]["domesticTsunami"]),
+            inline=False,
+        )
+        embed.set_footer(
+            text=f"P2P地震情報 | {data['issue']['source']}が{data['issue']['time']}に発表しました"
+        )
+
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot):
