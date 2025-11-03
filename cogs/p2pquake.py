@@ -1,3 +1,4 @@
+import logging
 import os
 import traceback
 from datetime import datetime
@@ -182,6 +183,7 @@ class P2PQuake(commands.Cog):
     def __init__(self, bot: DiscordEEWBot):
         self.bot = bot
         self.ws = None
+        self.logger = logging.getLogger("p2pquake")
 
     async def cog_load(self) -> None:
         if self.bot.is_ready():
@@ -204,7 +206,7 @@ class P2PQuake(commands.Cog):
                 "https://api.p2pquake.net/v2/ws"
             ) as ws:
                 self.ws = ws
-                print("P2P WebSocket Connected")
+                self.logger.info("P2P WebSocket Connected")
 
                 try:
                     async for msg in ws:
@@ -236,11 +238,12 @@ class P2PQuake(commands.Cog):
                         ):
                             break
                 except Exception as e:
-                    print(traceback.format_exc())
+                    self.logger.error("ERROR")
+                    self.logger.error(traceback.format_exc())
                     await self.ws.close()
                     self.bot.loop.create_task(self.listen_p2pquake())
 
-                print("P2P WebSocket Disconnected")
+                self.logger.info("P2P WebSocket Disconnected")
 
     async def on_jma_quake(self, data) -> None:
         embeds = []

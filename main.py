@@ -1,3 +1,4 @@
+import logging
 import os
 import traceback
 
@@ -13,6 +14,7 @@ class DiscordEEWBot(commands.Bot):
             command_prefix=(), help_command=None, intents=discord.Intents.default()
         )
 
+        self.logger = logging.getLogger("bot")
         self.initial_extensions = ["cogs.debug", "cogs.p2pquake"]
 
     async def setup_hook(self) -> None:
@@ -26,13 +28,13 @@ class DiscordEEWBot(commands.Bot):
         self.tree.on_error = self.on_tree_error
 
     async def on_ready(self):
-        print(f"Logged in as {self.user}")
+        self.logger.info(f"Logged in as {self.user}")
 
     async def on_tree_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ):
-        print(f"ERROR: {interaction.command}\n{error}")
-        print(traceback.format_exc())
+        self.logger.error(f"ERROR: {interaction.command}\n{error}")
+        self.logger.error(traceback.format_exc())
 
         if isinstance(error, app_commands.CommandOnCooldown):
             msg = f"コマンドはクールダウン中です、**{error.retry_after:.2f}**秒後に再度お試しください"
@@ -82,7 +84,7 @@ class DiscordEEWBot(commands.Bot):
 
 def main():
     bot = DiscordEEWBot()
-    bot.run(os.environ.get("DISCORD_TOKEN"))
+    bot.run(os.environ.get("DISCORD_TOKEN"), root_logger=True, log_level=logging.INFO)
 
 
 if __name__ == "__main__":
