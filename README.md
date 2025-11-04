@@ -1,0 +1,5 @@
+# DiscordEEWBot
+
+DiscordにP2P地震情報から取得した地震情報などを通知するBot
+
+個人利用を想定しています
