@@ -9,13 +9,6 @@ from discord import app_commands
 from discord.ext import commands
 from main import DiscordEEWBot
 
-QUAKE_NOTICE_CHANNEL_ID = 1022180008762019931
-QUAKE_NOTICE_ROLE_ID = 1329352490499571722
-TUNAMI_NOTICE_CHANNEL_ID = 1329352412892499988
-TUNAMI_NOTICE_ROLE_ID = 1329352555578396743
-EEW_NOTICE_CHANNEL_ID = 1022179884384133170
-EEW_NOTICE_ROLE_ID = 1329352085065568331
-
 
 def format_issue_type(issue_type: str) -> str:
     """
@@ -295,8 +288,10 @@ class P2PQuake(commands.Cog):
         if len(data["points"]) > 0 and data["earthquake"]["maxScale"] >= 30:
             embeds.append(format_earthquake_points(data["points"]))
 
-        await self.bot.get_channel(QUAKE_NOTICE_CHANNEL_ID).send(
-            content=f"<@&{QUAKE_NOTICE_ROLE_ID}>", embeds=embeds
+        channel_id = int(os.environ.get("QUAKE_NOTICE_CHANNEL_ID"))
+        role_id = int(os.environ.get("QUAKE_NOTICE_ROLE_ID"))
+        await self.bot.get_channel(channel_id).send(
+            content=f"<@&{role_id}>", embeds=embeds
         )
 
     async def on_jma_tunami(self, data) -> None:
@@ -337,8 +332,10 @@ class P2PQuake(commands.Cog):
                 text=f"P2P地震情報 | {data['issue']['source']}が{data['issue']['time']}に発表しました"
             )
 
-        await self.bot.get_channel(TUNAMI_NOTICE_CHANNEL_ID).send(
-            content=f"<@&{TUNAMI_NOTICE_ROLE_ID}>", embed=embed
+        channel_id = int(os.environ.get("TUNAMI_NOTICE_CHANNEL_ID"))
+        role_id = int(os.environ.get("TUNAMI_NOTICE_ROLE_ID"))
+        await self.bot.get_channel(channel_id).send(
+            content=f"<@&{role_id}>", embed=embed
         )
 
     async def on_jma_eew(self, data) -> None:
@@ -388,8 +385,10 @@ class P2PQuake(commands.Cog):
 
         embed.set_footer(text=f"P2P地震情報 | {data['issue']['time']}に発表しました")
 
-        await self.bot.get_channel(EEW_NOTICE_CHANNEL_ID).send(
-            content=f"<@&{EEW_NOTICE_ROLE_ID}>", embed=embed
+        channel_id = int(os.environ.get("EEW_NOTICE_CHANNEL_ID"))
+        role_id = int(os.environ.get("EEW_NOTICE_ROLE_ID"))
+        await self.bot.get_channel(channel_id).send(
+            content=f"<@&{role_id}>", embed=embed
         )
 
     @app_commands.command(name="quake-info", description="最新の地震情報を表示します")
