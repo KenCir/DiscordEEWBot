@@ -181,29 +181,26 @@ class P2PQuake(commands.Cog):
         self.latest_quake_data = None
 
     async def cog_load(self) -> None:
-        if self.bot.is_ready():
-            self.bot.loop.create_task(self.listen_p2pquake())
+        self.bot.loop.create_task(self.listen_p2pquake())
 
     async def cog_unload(self) -> None:
         if self.ws is not None:
             await self.ws.close()
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        self.bot.loop.create_task(self.listen_p2pquake())
-
     async def listen_p2pquake(self):
         latest_data_id = None
 
-        async with aiohttp.ClientSession() as session:
-            async with session.ws_connect(
-                # "wss://api-realtime-sandbox.p2pquake.net/v2/ws",
-                "https://api.p2pquake.net/v2/ws"
-            ) as ws:
-                self.ws = ws
-                self.logger.info("P2P WebSocket Connected")
+        await self.bot.wait_until_ready()
 
-                try:
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.ws_connect(
+                    # "wss://api-realtime-sandbox.p2pquake.net/v2/ws",
+                    "https://api.p2pquake.net/v2/ws"
+                ) as ws:
+                    self.ws = ws
+                    self.logger.info("P2P WebSocket Connected")
+
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = msg.json()
@@ -232,13 +229,13 @@ class P2PQuake(commands.Cog):
                             or msg.type == aiohttp.WSMsgType.CLOSE
                         ):
                             break
-                except Exception as e:
-                    self.logger.error("ERROR")
-                    self.logger.error(traceback.format_exc())
-                    await self.ws.close()
-                    self.bot.loop.create_task(self.listen_p2pquake())
+            except Exception as e:
+                self.logger.error("ERROR")
+                self.logger.error(traceback.format_exc())
+                await self.ws.close()
+                self.bot.loop.create_task(self.listen_p2pquake())
 
-                self.logger.info("P2P WebSocket Disconnected")
+        self.logger.info("P2P WebSocket Disconnected")
 
     async def on_jma_quake(self, data) -> None:
         self.latest_quake_data = data
