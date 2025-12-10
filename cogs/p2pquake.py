@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import traceback
@@ -180,62 +181,109 @@ class P2PQuake(commands.Cog):
         self.logger = logging.getLogger("p2pquake")
         self.latest_quake_data = None
 
+        self.should_reconnect = True
+        self.retry_count = 0
+        self.max_retries = 5  # 5回までは即再接続
+        self.retry_interval = 5  # 失敗時の最低待機秒数
+        self.cooldown_wait = 300  # 5回連続失敗したら5分休む（300秒）
+
     async def cog_load(self) -> None:
         self.bot.loop.create_task(self.listen_p2pquake())
 
     async def cog_unload(self) -> None:
+        self.should_reconnect = False  # ユーザー操作による unload → 再接続しない
         if self.ws is not None:
             await self.ws.close()
 
-    async def listen_p2pquake(self):
-        latest_data_id = None
+    async def connect_websocket(self, session):
+        """WebSocket接続処理（リトライ制御あり）"""
 
+        while self.should_reconnect:
+            try:
+                self.logger.info("Trying to connect to P2P WebSocket...")
+                # ws = await session.ws_connect(
+                #      "wss://api-realtime-sandbox.p2pquake.net/v2/ws",
+                #    proxy=os.environ.get("PROXY_URL"),
+                # )
+                ws = await session.ws_connect(
+                    "https://api.p2pquake.net/v2/ws",
+                    proxy=os.environ.get("PROXY_URL"),
+                )
+                self.logger.info("P2P WebSocket Connected")
+                self.retry_count = 0  # 成功したらリセット
+                return ws
+
+            except Exception:
+                self.retry_count += 1
+                self.logger.error("WebSocket connection failed:")
+                self.logger.error(traceback.format_exc())
+
+                # 最大リトライ回数を超えたら数分待機
+                if self.retry_count > self.max_retries:
+                    wait_time = self.cooldown_wait
+                    self.logger.warning(
+                        f"Too many retries. Waiting {wait_time} seconds before retrying..."
+                    )
+                else:
+                    wait_time = self.retry_interval
+
+                await asyncio.sleep(wait_time)
+
+        return None  # should_reconnect が False の場合
+
+    async def listen_p2pquake(self):
         await self.bot.wait_until_ready()
 
         async with aiohttp.ClientSession() as session:
-            try:
-                async with session.ws_connect(
-                    # "wss://api-realtime-sandbox.p2pquake.net/v2/ws",
-                    "https://api.p2pquake.net/v2/ws"
-                ) as ws:
-                    self.ws = ws
-                    self.logger.info("P2P WebSocket Connected")
+            while self.should_reconnect:
+                ws = await self.connect_websocket(session)
+                if ws is None:
+                    break
 
+                self.ws = ws
+
+                try:
                     async for msg in ws:
                         if msg.type == aiohttp.WSMsgType.TEXT:
                             data = msg.json()
 
-                            if data.get("_id") == latest_data_id:
+                            # 重複除外
+                            data_id = data.get("_id")
+                            if data_id == self.latest_quake_data:
                                 continue
-                            latest_data_id = data.get("_id")
+                            self.latest_quake_data = data_id
 
                             match data["code"]:
-                                case 551:  # 地震情報
+                                case 551:
                                     await self.on_jma_quake(data)
-                                case 552:  # 津波予報
+                                case 552:
                                     await self.on_jma_tunami(data)
-                                case 554:  # (緊急地震速報 発表検出)
-                                    pass
-                                case 555:  # (各地域ピア数)
-                                    pass
-                                case 556:  # 緊急地震速報(警報)
+                                case 556:
                                     await self.on_jma_eew(data)
-                                case 561:  # 地震感知情報
+                                case _:
                                     pass
-                                case 9611:  # 地震感知情報 解析結果
-                                    pass
-                        elif (
-                            msg.type == aiohttp.WSMsgType.ERROR
-                            or msg.type == aiohttp.WSMsgType.CLOSE
-                        ):
-                            break
-            except Exception as e:
-                self.logger.error("ERROR")
-                self.logger.error(traceback.format_exc())
-                await self.ws.close()
-                self.bot.loop.create_task(self.listen_p2pquake())
 
-        self.logger.info("P2P WebSocket Disconnected")
+                        elif msg.type in (
+                            aiohttp.WSMsgType.CLOSE,
+                            aiohttp.WSMsgType.ERROR,
+                        ):
+                            raise aiohttp.ClientConnectionError()
+
+                except asyncio.CancelledError:
+                    # cog_unload → Cancelled → 再接続しない
+                    self.logger.info("listen_p2pquake task cancelled.")
+                    break
+
+                except Exception:
+                    if self.should_reconnect:
+                        self.logger.error("Unexpected error. Reconnecting...")
+                        self.logger.error(traceback.format_exc())
+                        await asyncio.sleep(1)  # 少し待って再接続
+                        continue
+                    else:
+                        break
+
+            self.logger.info("P2P WebSocket Disconnected")
 
     async def on_jma_quake(self, data) -> None:
         self.latest_quake_data = data

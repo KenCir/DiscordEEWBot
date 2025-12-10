@@ -11,7 +11,10 @@ from dotenv import load_dotenv
 class DiscordEEWBot(commands.Bot):
     def __init__(self):
         super().__init__(
-            command_prefix=(), help_command=None, intents=discord.Intents.default()
+            command_prefix=(),
+            help_command=None,
+            intents=discord.Intents.default(),
+            proxy=os.environ.get("PROXY_URL"),
         )
 
         self.logger = logging.getLogger("bot")
