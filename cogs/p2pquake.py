@@ -358,7 +358,7 @@ class P2PQuake(commands.Cog):
             ]
             embed = discord.Embed(
                 title="津波予報情報",
-                description=f"津波予報情報が発表されました",
+                description="津波予報情報が発表されました",
                 timestamp=datetime.strptime(data["time"], "%Y/%m/%d %H:%M:%S.%f"),
             )
 
